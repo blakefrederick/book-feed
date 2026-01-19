@@ -14,20 +14,56 @@ class PassageService {
   private useFallback = false
   private mockCurrentIndex = 0
   private currentBookId: string | null = null
+  private availableBooks: string[] = []
+  private initialized = false
+
+  private async initializeBooks(): Promise<void> {
+    if (this.initialized) return
+    
+    try {
+      const booksSnapshot = await getDocs(collection(db, 'books'))
+      this.availableBooks = booksSnapshot.docs.map(doc => doc.id)
+      
+      if (this.availableBooks.length > 0) {
+        this.currentBookId = this.availableBooks[0]
+        console.log('Found books:', this.availableBooks);
+        console.log('Using book:', this.currentBookId);
+      } else {
+        console.log('No books found');
+        this.useFallback = true
+      }
+      this.initialized = true
+    } catch (error) {
+      this.useFallback = true
+      this.initialized = true
+    }
+  }
 
   async getPassages(fresh = false, bookId?: string): Promise<Passage[]> {
-    console.log('[PassageService] getPassages called with fresh:', fresh, 'bookId:', bookId);
+    console.log('getPassages called with fresh:', fresh, 'bookId:', bookId);
     
-    // Set current book ID if provided, otherwise use default
     if (bookId) {
       this.currentBookId = bookId
-    } 
+    }
+    
+    // only initialize when first called
+    if (!this.initialized && !this.useFallback) {
+      await this.initializeBooks()
+    }
+    
+    // fallback time
+    if (!this.currentBookId) {
+      console.log('No book ID available, using mock data');
+      return this.getPassagesFromMock(fresh)
+    }
+    
+    console.log('Using book ID:', this.currentBookId);
 
-    // Try Firebase first
+    // Try Firebase
     if (!this.useFallback) {
       try {
         const firebaseResults = await this.getPassagesFromFirebase(fresh)
-        // If Firebase returns empty results, fall back to mock data
+        // If Firebase returns empty results, fallback to mock
         if (firebaseResults.length === 0 && fresh) {
           console.log('Firebase returned no results, falling back to mock data');
           this.useFallback = true
@@ -51,21 +87,21 @@ class PassageService {
     }
 
     let q = query(
-      collection(db, 'books', this.currentBookId!, 'passages'),
+      collection(db, 'books', this.currentBookId, 'passages'),
       orderBy('createdAt', 'desc'),
       limit(this.BATCH_SIZE)
     )
 
     if (this.lastVisible && !fresh) {
       q = query(
-        collection(db, 'books', this.currentBookId!, 'passages'),
+        collection(db, 'books', this.currentBookId, 'passages'),
         orderBy('createdAt', 'desc'),
         startAfter(this.lastVisible),
         limit(this.BATCH_SIZE)
       )
     }
 
-    console.log('Executing Firestore query...');
+console.log('Executing Firestore query for book:', this.currentBookId);
     const snapshot = await getDocs(q)
     console.log('Query result - empty:', snapshot.empty, 'size:', snapshot.size);
     
@@ -156,8 +192,20 @@ class PassageService {
     }
   }
 
+  getAvailableBooks(): string[] {
+    return this.availableBooks
+  }
+
   getCurrentBookId(): string | null {
     return this.currentBookId
+  }
+
+  async refreshBooks(): Promise<void> {
+    this.availableBooks = []
+    this.currentBookId = null
+    this.useFallback = false
+    this.initialized = false
+    await this.initializeBooks()
   }
 }
 
