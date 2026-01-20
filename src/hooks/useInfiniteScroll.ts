@@ -51,8 +51,8 @@ export function useInfiniteScroll<T>({ fetchMore, hasMore }: UseInfiniteScrollPr
       const newItems = await fetchMore()
       console.log('[useInfiniteScroll] Fetched', newItems.length, 'new items')
       console.log('[useInfiniteScroll] Sample new item:', newItems[0] ? {
-        id: newItems[0].id || 'no-id',
-        hasText: !!newItems[0].text
+        id: (newItems[0] as any).id || 'no-id',
+        hasText: !!(newItems[0] as any).text
       } : 'none')
       
       setItems(prev => {
@@ -80,7 +80,6 @@ export function useInfiniteScroll<T>({ fetchMore, hasMore }: UseInfiniteScrollPr
 
 export function useReadingTime() {
   const startTime = useRef<number | null>(null)
-  const [readTime, setReadTime] = useState(0)
 
   const startReading = () => {
     startTime.current = Date.now()
@@ -89,22 +88,11 @@ export function useReadingTime() {
   const stopReading = () => {
     if (startTime.current) {
       const duration = Date.now() - startTime.current
-      setReadTime(prev => prev + duration)
       startTime.current = null
       return duration
     }
     return 0
   }
 
-  const resetReading = () => {
-    setReadTime(0)
-    startTime.current = null
-  }
-
-  return {
-    readTime,
-    startReading,
-    stopReading,
-    resetReading
-  }
+  return { startReading, stopReading }
 }

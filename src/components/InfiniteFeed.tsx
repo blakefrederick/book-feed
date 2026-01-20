@@ -6,10 +6,14 @@ import { PassageCard } from '@/components/PassageCard'
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll'
 import { passageService } from '@/services/passageService'
 import { Passage } from '@/types'
+import { useUser } from '@/services/userService'
+import { db } from '@/lib/firebase'
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
 
 export function InfiniteFeed() {
   const [visibleIndex, setVisibleIndex] = useState(0)
   const containerRef = useRef<HTMLDivElement>(null)
+  const { currentUser } = useUser()
   
   const {
     items: passages,
@@ -20,13 +24,6 @@ export function InfiniteFeed() {
     fetchMore: () => passageService.getPassages(),
     hasMore: () => passageService.hasMore()
   })
-
-  // Debug: Log passages and loading state
-  useEffect(() => {
-    console.log('Passages:', passages)
-    console.log('Loading:', loading)
-    console.log('Error:', error)
-  }, [passages, loading, error])
 
   // Track which card is currently visible
   useEffect(() => {
@@ -55,20 +52,21 @@ export function InfiniteFeed() {
     return () => observer.disconnect()
   }, [passages])
 
-  const handleLike = (passageId: string) => {
-    passageService.likePassage(passageId)
-  }
+  const handleReadingTimeUpdate = async (passageId: string, duration: number) => {
+    if (!currentUser || duration < 1000) return; // Only track if user is logged in and duration is significant
 
-  const handleShare = (passageId: string) => {
-    passageService.sharePassage(passageId)
-  }
-
-  const handleBookmark = (passageId: string) => {
-    passageService.bookmarkPassage(passageId)
-  }
-
-  const handleReadingTimeUpdate = (passageId: string, duration: number) => {
-    passageService.trackEngagement(passageId, duration)
+    console.log(`Passage ${passageId} was viewed for ${duration}ms by user ${currentUser.id}`)
+    try {
+      await addDoc(collection(db, "engagement"), {
+        userId: currentUser.id,
+        passageId: passageId,
+        duration: duration,
+        timestamp: serverTimestamp(),
+      });
+      console.log("Engagement tracked successfully");
+    } catch (e) {
+      console.error("Error adding document: ", e);
+    }
   }
 
   if (error) {
@@ -104,9 +102,6 @@ export function InfiniteFeed() {
             >
               <PassageCard
                 passage={passage}
-                onLike={handleLike}
-                onShare={handleShare}
-                onBookmark={handleBookmark}
                 onReadingTimeUpdate={handleReadingTimeUpdate}
                 isVisible={visibleIndex === index}
               />
@@ -135,13 +130,6 @@ export function InfiniteFeed() {
           {passages.length > 0 ? `${visibleIndex + 1} / ${passages.length}` : '0 / 0'}
         </div>
       </div>
-
-      {/* Fallback notification banner */}
-      {passageService.isUsingFallback() && (
-        <div className="fixed top-4 right-4 z-50 bg-yellow-500/90 backdrop-blur-sm text-yellow-900 px-3 py-2 rounded-lg shadow-lg">
-          <p className="text-sm font-medium">Demo Mode</p>
-        </div>
-      )}
     </div>
   )
 }

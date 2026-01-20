@@ -12,6 +12,14 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
 }
 
+// Check if all required Firebase config values are present
+const requiredConfigKeys = ['apiKey', 'authDomain', 'projectId']
+const missingKeys = requiredConfigKeys.filter(key => !firebaseConfig[key as keyof typeof firebaseConfig])
+
+if (missingKeys.length > 0) {
+  console.warn('Missing Firebase configuration:', missingKeys)
+}
+
 const app = initializeApp(firebaseConfig)
 console.log('Firebase app initialized successfully')
 

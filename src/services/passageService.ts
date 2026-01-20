@@ -86,6 +86,10 @@ class PassageService {
       this.hasReachedEnd = false
     }
 
+    if (!this.currentBookId) {
+      throw new Error('No book selected')
+    }
+
     let q = query(
       collection(db, 'books', this.currentBookId, 'passages'),
       orderBy('createdAt', 'desc'),
@@ -150,11 +154,6 @@ console.log('Executing Firestore query for book:', this.currentBookId);
   async likePassage(passageId: string): Promise<void> {
     // @TODO
     console.log('Liking passage:', passageId)
-  }
-
-  async trackEngagement(passageId: string, readTime: number): Promise<void> {
-    // @TODO
-    console.log('Tracking engagement:', { passageId, readTime })
   }
 
   async sharePassage(passageId: string): Promise<void> {
